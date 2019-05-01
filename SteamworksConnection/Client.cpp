@@ -8,8 +8,6 @@ Client::Client(ISteamGameCoordinator* pCoordinator)
 
 void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 {
-	//std::cout << "New GC Message is available. Retrieving.." << std::endl;
-
 	std::vector<char> recvBuffer;
 	recvBuffer.resize(pMsg->m_nMessageSize);
 
@@ -21,8 +19,6 @@ void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 	if (msgType & PROTO_FLAG)
 	{
 		auto msg_id = msgType & (~PROTO_FLAG);
-
-		//std::cout << "Retrieved message with id " << msg_id << std::endl;
 
 		//WE ARE IN BOYS LETS GO!
 		if (msg_id == k_EMsgGCClientWelcome)
@@ -53,13 +49,6 @@ void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 				std::cout << "---------------" << std::endl;
 				std::cout << "Time: " << match.matchtime() << std::endl;
 				std::cout << "Link: " << match.roundstatsall(match.roundstatsall_size() - 1).map().c_str() << std::endl;
-				
-				//for (int j = 0; j < match.roundstatsall_size(); j++) {
-				//	auto roundstats = match.roundstatsall(j);
-
-				//	std::cout << roundstats.map().c_str() << std::endl;
-				//}
-
 			}
 		}
 	}
@@ -71,8 +60,11 @@ EGCResults Client::SendMessageToGC(uint32 uMsgType, google::protobuf::Message* m
 	sendBuffer.resize(msg->ByteSize() + typeSize);
 
 	uMsgType |= PROTO_FLAG;
-	((uint32*)sendBuffer.data())[0] = uMsgType;
-	((uint32*)sendBuffer.data())[1] = 0;
+
+	auto data = (uint32*)sendBuffer.data();
+
+	data[0] = uMsgType;
+	data[1] = 0;
 
 	msg->SerializeToArray(sendBuffer.data() + typeSize, sendBuffer.size() - typeSize);
 
