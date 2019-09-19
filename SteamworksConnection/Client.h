@@ -26,9 +26,16 @@ private:
 	CCallback<Client, GCMessageAvailable_t, false> CbOnMessageAvailable;
 	ISteamGameCoordinator* m_pCoordinator;
 	static const uint32 typeSize = 2 * sizeof(uint32);
+	bool m_bIsReady;
+	bool m_bInWait;
+	HANDLE m_hPipeOut;
 
 	void OnMessageAvailable(GCMessageAvailable_t* pMsg);
 public:
 	Client(ISteamGameCoordinator*);
 	EGCResults SendMessageToGC(uint32 uMsgType, google::protobuf::Message* msg);
+	bool IsReady() { return m_bIsReady; }
+	bool InWait() { return m_bInWait; }
+	void Wait() { m_bInWait = true; }
+	void SetPipeHandle(HANDLE hPipe) { m_hPipeOut = hPipe; }
 };

@@ -3,7 +3,8 @@
 Client::Client(ISteamGameCoordinator* pCoordinator)
 	:CbOnMessageAvailable(this, &Client::OnMessageAvailable), m_pCoordinator(pCoordinator) 
 {
-
+	m_bIsReady = false;
+	m_bInWait = false;
 }
 
 void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
@@ -23,16 +24,18 @@ void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 		//WE ARE IN BOYS LETS GO!
 		if (msg_id == k_EMsgGCClientWelcome)
 		{
+			m_bIsReady = true;
+
 			std::cout << "Received ClientWelcome" << std::endl;
-			std::cout << "Requesting Match history" << std::endl;
+			//std::cout << "Requesting Match history" << std::endl;
 
-			CMsgGCCStrike15_v2_MatchListRequestRecentUserGames msg;
-			msg.set_accountid(SteamUser()->GetSteamID().GetAccountID());
+			//CMsgGCCStrike15_v2_MatchListRequestRecentUserGames msg;
+			//msg.set_accountid(SteamUser()->GetSteamID().GetAccountID());
 
-			if (SendMessageToGC(k_EMsgGCCStrike15_v2_MatchListRequestRecentUserGames, &msg) != k_EGCResultOK)
-			{
-				std::cout << "Couldn't request match history for some reason" << std::endl;
-			}
+			//if (SendMessageToGC(k_EMsgGCCStrike15_v2_MatchListRequestRecentUserGames, &msg) != k_EGCResultOK)
+			//{
+			//	std::cout << "Couldn't request match history for some reason" << std::endl;
+			//}
 		}
 
 		if (msg_id == k_EMsgGCCStrike15_v2_MatchList)
@@ -45,10 +48,25 @@ void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 			for (int i = 0; i < msg.matches_size(); i++)
 			{
 				auto match = msg.matches(i);
+				auto link = match.roundstatsall(match.roundstatsall_size() - 1).map();
+				auto time = match.matchtime();
+
 				std::cout << "Match #" << i + 1 << std::endl;
 				std::cout << "---------------" << std::endl;
-				std::cout << "Time: " << match.matchtime() << std::endl;
-				std::cout << "Link: " << match.roundstatsall(match.roundstatsall_size() - 1).map().c_str() << std::endl;
+				std::cout << "Time: " << time << std::endl;
+				std::cout << "Link: " << link.c_str() << std::endl;
+
+				std::string sPipeMsg = "--demo " + link + "|" + std::to_string(time) + "\n";
+
+				DWORD dwWritten;
+
+				WriteFile(m_hPipeOut,
+					sPipeMsg.c_str(),
+					sPipeMsg.size(),   // = length + '\0'
+					&dwWritten,
+					NULL);
+
+				m_bInWait = false;
 			}
 		}
 	}

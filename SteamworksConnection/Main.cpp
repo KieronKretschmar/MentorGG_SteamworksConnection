@@ -1,6 +1,7 @@
 
 
 #include "Client.h"
+#include <sstream>
 
 void ReportError(const std::string& sMessage)
 {
@@ -62,15 +63,94 @@ int main(char* argv[])
 
 	CreateThread(nullptr, 0, MessageLoop, (void*)coordinator, 0, nullptr);
 
+	HANDLE hPipeIn;
+	char buffer[1024];
+	DWORD dwRead;
+
+	hPipeIn = CreateNamedPipe(TEXT("\\\\.\\pipe\\ShareCodePipe"),
+		PIPE_ACCESS_DUPLEX,
+		PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,   // FILE_FLAG_FIRST_PIPE_INSTANCE is not needed but forces CreateNamedPipe(..) to fail if the pipe already exists...
+		1,
+		1024 * 16,
+		1024 * 16,
+		NMPWAIT_USE_DEFAULT_WAIT,
+		NULL);
+
 	CMsgClientHello hello;
 	hello.set_client_session_need(1);
 
 	std::cout << "Sending Hello" << std::endl;
 
-	if(client.SendMessageToGC(k_EMsgGCClientHello, &hello) != k_EGCResultOK)
+	if (client.SendMessageToGC(k_EMsgGCClientHello, &hello) != k_EGCResultOK)
 	{
 		ReportError("Failed to send Hello -_-");
 		return 0;
+	}
+
+	while (!client.IsReady()) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+	}
+
+	std::cout << "Is ready" << std::endl;
+
+	while (hPipeIn != INVALID_HANDLE_VALUE)
+	{
+		//They connected
+		if (ConnectNamedPipe(hPipeIn, NULL) != FALSE)   // wait for someone to connect to the pipe
+		{
+			//Connect to their pipe until it worked
+			//do {
+			//	hPipeOut = CreateFile(TEXT("\\\\.\\pipe\\ShareCodePipeI"),
+			//		GENERIC_READ | GENERIC_WRITE,
+			//		0,
+			//		NULL,
+			//		OPEN_EXISTING,
+			//		0,
+			//		NULL);
+
+			//	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+			//} while (hPipeOut == INVALID_HANDLE_VALUE);
+
+			client.SetPipeHandle(hPipeIn);
+
+			while (ReadFile(hPipeIn, buffer, sizeof(buffer) - 1, &dwRead, NULL) != FALSE)
+			{
+				/* add terminating zero */
+				buffer[dwRead] = '\0';
+
+				/* do something with data in buffer */
+				std::stringstream ss(buffer);
+				std::string s;
+				std::vector<std::string> vSharecode;
+
+				while (std::getline(ss, s, '|')) {
+					vSharecode.push_back(s);
+				}
+
+				printf("\nShareCode data received: \n");
+				printf("m: %s\no: %s\nt: %s\n", vSharecode[0].c_str(), vSharecode[1].c_str(), vSharecode[2].c_str());				
+
+				CMsgGCCStrike15_v2_MatchListRequestFullGameInfo fgi;
+
+				fgi.set_matchid(strtoull(vSharecode[0].c_str(), NULL, 0));
+				fgi.set_outcomeid(strtoull(vSharecode[1].c_str(), NULL, 0));
+				fgi.set_token(atoi(vSharecode[2].c_str()));
+
+				client.Wait();
+				auto res = client.SendMessageToGC(k_EMsgGCCStrike15_v2_MatchListRequestFullGameInfo, &fgi);
+				if (res != k_EGCResultOK)
+				{
+					ReportError("Failed to request match data");
+				}
+
+				while (client.InWait()) {
+					Sleep(50);
+				}
+			}
+		}
+
+		DisconnectNamedPipe(hPipeIn);
 	}
 	
 	std::cin.get();
