@@ -42,32 +42,46 @@ void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 		{
 			CMsgGCCStrike15_v2_MatchList msg;
 			msg.ParseFromArray(recvBuffer.data() + typeSize, msgSize - typeSize);
+			DWORD dwWritten;
 
 			std::cout << "Received MatchList with " << msg.matches_size() << " matches" << std::endl;
 
-			for (int i = 0; i < msg.matches_size(); i++)
+			std::string sPipeMsg = "--nodemo\n";
+
+			if (!msg.matches_size())
 			{
-				auto match = msg.matches(i);
-				auto link = match.roundstatsall(match.roundstatsall_size() - 1).map();
-				auto time = match.matchtime();
-
-				std::cout << "Match #" << i + 1 << std::endl;
-				std::cout << "---------------" << std::endl;
-				std::cout << "Time: " << time << std::endl;
-				std::cout << "Link: " << link.c_str() << std::endl;
-
-				std::string sPipeMsg = "--demo " + link + "|" + std::to_string(time) + "\n";
-
-				DWORD dwWritten;
-
 				WriteFile(m_hPipeOut,
 					sPipeMsg.c_str(),
 					sPipeMsg.size(),   // = length + '\0'
 					&dwWritten,
 					NULL);
-
-				m_bInWait = false;
 			}
+			else
+			{
+				for (int i = 0; i < msg.matches_size(); i++)
+				{
+					auto match = msg.matches(i);
+					auto link = match.roundstatsall(match.roundstatsall_size() - 1).map();
+					auto time = match.matchtime();
+
+					std::cout << "Match #" << i + 1 << std::endl;
+					std::cout << "---------------" << std::endl;
+					std::cout << "Time: " << time << std::endl;
+					std::cout << "Link: " << link.c_str() << std::endl;
+
+					sPipeMsg = "--demo " + link + "|" + std::to_string(time) + "\n";
+
+					WriteFile(m_hPipeOut,
+						sPipeMsg.c_str(),
+						sPipeMsg.size(),   // = length + '\0'
+						&dwWritten,
+						NULL);
+
+					break;
+				}
+			}
+
+			m_bInWait = false;
 		}
 	}
 }

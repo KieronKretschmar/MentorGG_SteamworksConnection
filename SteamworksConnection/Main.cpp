@@ -96,21 +96,8 @@ int main(char* argv[])
 	while (hPipeIn != INVALID_HANDLE_VALUE)
 	{
 		//They connected
-		if (ConnectNamedPipe(hPipeIn, NULL) != FALSE)   // wait for someone to connect to the pipe
+		if (ConnectNamedPipe(hPipeIn, NULL) != FALSE)
 		{
-			//Connect to their pipe until it worked
-			//do {
-			//	hPipeOut = CreateFile(TEXT("\\\\.\\pipe\\ShareCodePipeI"),
-			//		GENERIC_READ | GENERIC_WRITE,
-			//		0,
-			//		NULL,
-			//		OPEN_EXISTING,
-			//		0,
-			//		NULL);
-
-			//	std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-			//} while (hPipeOut == INVALID_HANDLE_VALUE);
 
 			client.SetPipeHandle(hPipeIn);
 
