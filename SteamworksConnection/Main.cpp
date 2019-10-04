@@ -67,6 +67,21 @@ int main(char* argv[])
 	char buffer[1024];
 	DWORD dwRead;
 
+	// Let everyone access pipe
+	// Initialize a security descriptor.  
+	PSECURITY_DESCRIPTOR pSD = (PSECURITY_DESCRIPTOR)LocalAlloc(LPTR,
+		SECURITY_DESCRIPTOR_MIN_LENGTH);
+
+	InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION);
+
+	// NULL means Everyone can acces the pipe
+	SetSecurityDescriptorDacl(pSD, TRUE, NULL, FALSE);
+
+	SECURITY_ATTRIBUTES sa;
+	sa.nLength = sizeof(sa);
+	sa.lpSecurityDescriptor = pSD;
+	sa.bInheritHandle = FALSE;
+
 	hPipeIn = CreateNamedPipe(TEXT("\\\\.\\pipe\\ShareCodePipe"),
 		PIPE_ACCESS_DUPLEX,
 		PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,   // FILE_FLAG_FIRST_PIPE_INSTANCE is not needed but forces CreateNamedPipe(..) to fail if the pipe already exists...
@@ -74,7 +89,7 @@ int main(char* argv[])
 		1024 * 16,
 		1024 * 16,
 		NMPWAIT_USE_DEFAULT_WAIT,
-		NULL);
+		&sa);
 
 	CMsgClientHello hello;
 	hello.set_client_session_need(1);
