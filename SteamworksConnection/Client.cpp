@@ -46,7 +46,7 @@ void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 
 			std::cout << "Received MatchList with " << msg.matches_size() << " matches" << std::endl;
 
-			std::string sPipeMsg = "--nodemo\n";
+			std::string sPipeMsg = "--demo NO_MATCHES_FOUND\n";
 
 			if (!msg.matches_size())
 			{

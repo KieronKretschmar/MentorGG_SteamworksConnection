@@ -113,7 +113,6 @@ int main(char* argv[])
 		//They connected
 		if (ConnectNamedPipe(hPipeIn, NULL) != FALSE)
 		{
-
 			client.SetPipeHandle(hPipeIn);
 
 			while (ReadFile(hPipeIn, buffer, sizeof(buffer) - 1, &dwRead, NULL) != FALSE)
@@ -143,7 +142,10 @@ int main(char* argv[])
 				auto res = client.SendMessageToGC(k_EMsgGCCStrike15_v2_MatchListRequestFullGameInfo, &fgi);
 				if (res != k_EGCResultOK)
 				{
-					ReportError("Failed to request match data");
+					std::cout << "failed to send message to GC" << std::endl;
+					std::string sPipeMsg = "--demo UNKNOWN_ERROR (" + std::to_string(res) + ")\n";
+					DWORD dwWritten;
+					WriteFile(hPipeIn, sPipeMsg.c_str(), sPipeMsg.length(), &dwWritten, nullptr);					
 				}
 
 				while (client.InWait()) {
