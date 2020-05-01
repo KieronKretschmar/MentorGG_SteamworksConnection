@@ -1,4 +1,9 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "Client.h"
+#include <chrono> 
+#include <ctime> 
+#include <iomanip>
 
 Client::Client(ISteamGameCoordinator* pCoordinator)
 	:CbOnMessageAvailable(this, &Client::OnMessageAvailable), m_pCoordinator(pCoordinator) 
@@ -64,6 +69,9 @@ void Client::OnMessageAvailable(GCMessageAvailable_t* pMsg)
 					auto link = match.roundstatsall(match.roundstatsall_size() - 1).map();
 					auto time = match.matchtime();
 
+					auto now = std::chrono::system_clock::now();
+					auto now_c = std::chrono::system_clock::to_time_t(now);
+					std::cout << std::put_time(std::localtime(&now_c), "%c") << std::endl;
 					std::cout << "Match #" << i + 1 << std::endl;
 					std::cout << "---------------" << std::endl;
 					std::cout << "Time: " << time << std::endl;
