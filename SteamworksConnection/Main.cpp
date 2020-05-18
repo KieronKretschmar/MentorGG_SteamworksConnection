@@ -1,10 +1,16 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "Client.h"
 #include <sstream>
+#include <chrono> 
+#include <ctime> 
+#include <iomanip>
 
 void ReportError(const std::string& sMessage)
 {
-	std::cout << sMessage << std::endl;
-	std::cin.get();
+	auto now = std::chrono::system_clock::now();
+	auto now_c = std::chrono::system_clock::to_time_t(now);
+	std::cout << std::put_time(std::localtime(&now_c), "%c") << "> " << sMessage << std::endl;
 }
 
 DWORD WINAPI MessageLoop(void* pArgs)
