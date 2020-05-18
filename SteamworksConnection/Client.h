@@ -38,4 +38,5 @@ public:
 	bool InWait() { return m_bInWait; }
 	void Wait() { m_bInWait = true; }
 	void SetPipeHandle(HANDLE hPipe) { m_hPipeOut = hPipe; }
+	void ClearWait() { m_bInWait = false; }
 };

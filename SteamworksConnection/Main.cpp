@@ -140,6 +140,7 @@ int main(char* argv[])
 				auto res = client.SendMessageToGC(k_EMsgGCCStrike15_v2_MatchListRequestFullGameInfo, &fgi);
 				if (res != k_EGCResultOK)
 				{
+					client.ClearWait();
 					std::cout << "failed to send message to GC: " << res << std::endl;
 					std::string sPipeMsg = "--demo UNKNOWN_ERROR (" + std::to_string(res) + ")\n";
 					DWORD dwWritten;
