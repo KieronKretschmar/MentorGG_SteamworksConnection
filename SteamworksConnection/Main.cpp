@@ -10,7 +10,14 @@ void ReportError(const std::string& sMessage)
 {
 	auto now = std::chrono::system_clock::now();
 	auto now_c = std::chrono::system_clock::to_time_t(now);
-	std::cout << std::put_time(std::localtime(&now_c), "%c") << "> " << sMessage << std::endl;
+	std::cout << "[" << GetCurrentProcessId() << "]: " << std::put_time(std::localtime(&now_c), "%c") << "> " << sMessage << std::endl;
+}
+
+void SimpleLog(const std::string& sMessage)
+{
+	auto now = std::chrono::system_clock::now();
+	auto now_c = std::chrono::system_clock::to_time_t(now);
+	std::cout << "[" << GetCurrentProcessId() << "]: " << std::put_time(std::localtime(&now_c), "%c") << "> " << sMessage << std::endl;
 }
 
 DWORD WINAPI MessageLoop(void* pArgs)
@@ -26,6 +33,7 @@ DWORD WINAPI MessageLoop(void* pArgs)
 		catch (std::exception& e)
 		{
 			ReportError(e.what());
+			SimpleLog("Shutting down MessageLoop");
 			return 0;
 		}
 	}
@@ -36,18 +44,21 @@ int main(char* argv[])
 	if (SteamAPI_RestartAppIfNecessary(k_uAppIdInvalid))
 	{
 		ReportError("What");
+		SimpleLog("Shutting down");
 		return 0;
 	}
 
 	if (!SteamAPI_Init())
 	{
 		ReportError("SteamAPI_Init failed");
+		SimpleLog("Shutting down");
 		return 0;
 	}
 
 	if (!SteamUser()->BLoggedOn())
 	{
 		ReportError("You are not logged into Steam :(");
+		SimpleLog("Shutting down");
 		return 0;
 	}
 	else
@@ -60,6 +71,7 @@ int main(char* argv[])
 	if ( coordinator == nullptr )
 	{
 		ReportError("Couldn't grab Coordinator");
+		SimpleLog("Shutting down");
 		return 0;
 	}
 
@@ -98,11 +110,12 @@ int main(char* argv[])
 	CMsgClientHello hello;
 	hello.set_client_session_need(1);
 
-	std::cout << "Sending Hello" << std::endl;
+	SimpleLog("Sending Hello");
 
 	if (client.SendMessageToGC(k_EMsgGCClientHello, &hello) != k_EGCResultOK)
 	{
 		ReportError("Failed to send Hello -_-");
+		SimpleLog("Shutting down");
 		return 0;
 	}
 
@@ -110,7 +123,7 @@ int main(char* argv[])
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 
-	std::cout << "Is ready" << std::endl;
+	SimpleLog("Is Ready");
 
 	while (hPipeIn != INVALID_HANDLE_VALUE)
 	{
@@ -119,50 +132,58 @@ int main(char* argv[])
 		{
 			client.SetPipeHandle(hPipeIn);
 
-			while (ReadFile(hPipeIn, buffer, sizeof(buffer) - 1, &dwRead, NULL) != FALSE)
+			while (true)
 			{
-				/* add terminating zero */
-				buffer[dwRead] = '\0';
+				if (ReadFile(hPipeIn, buffer, sizeof(buffer) - 1, &dwRead, NULL))
+				{ 
+					buffer[dwRead] = '\0';
 
-				/* do something with data in buffer */
-				std::stringstream ss(buffer);
-				std::string s;
-				std::vector<std::string> vSharecode;
+					std::stringstream ss(buffer);
+					std::string s;
+					std::vector<std::string> vSharecode;
 
-				while (std::getline(ss, s, '|')) {
-					vSharecode.push_back(s);
+					while (std::getline(ss, s, '|')) {
+						vSharecode.push_back(s);
+					}
+
+					SimpleLog("\nShareCode data received: \n");
+					printf("m: %s\no: %s\nt: %s\n", vSharecode[0].c_str(), vSharecode[1].c_str(), vSharecode[2].c_str());
+
+					CMsgGCCStrike15_v2_MatchListRequestFullGameInfo fgi;
+
+					fgi.set_matchid(strtoull(vSharecode[0].c_str(), NULL, 0));
+					fgi.set_outcomeid(strtoull(vSharecode[1].c_str(), NULL, 0));
+					fgi.set_token(atoi(vSharecode[2].c_str()));
+
+					client.Wait();
+					auto res = client.SendMessageToGC(k_EMsgGCCStrike15_v2_MatchListRequestFullGameInfo, &fgi);
+					if (res != k_EGCResultOK)
+					{
+						client.ClearWait();
+						std::cout << "failed to send message to GC: " << res << std::endl;
+						std::string sPipeMsg = "--demo UNKNOWN_ERROR (" + std::to_string(res) + ")\n";
+						DWORD dwWritten;
+						WriteFile(hPipeIn, sPipeMsg.c_str(), sPipeMsg.length(), &dwWritten, nullptr);
+					}
+
+					while (client.InWait()) {
+						Sleep(50);
+					}
 				}
-
-				printf("\nShareCode data received: \n");
-				printf("m: %s\no: %s\nt: %s\n", vSharecode[0].c_str(), vSharecode[1].c_str(), vSharecode[2].c_str());				
-
-				CMsgGCCStrike15_v2_MatchListRequestFullGameInfo fgi;
-
-				fgi.set_matchid(strtoull(vSharecode[0].c_str(), NULL, 0));
-				fgi.set_outcomeid(strtoull(vSharecode[1].c_str(), NULL, 0));
-				fgi.set_token(atoi(vSharecode[2].c_str()));
-
-				client.Wait();
-				auto res = client.SendMessageToGC(k_EMsgGCCStrike15_v2_MatchListRequestFullGameInfo, &fgi);
-				if (res != k_EGCResultOK)
+				else
 				{
-					client.ClearWait();
-					std::cout << "failed to send message to GC: " << res << std::endl;
-					std::string sPipeMsg = "--demo UNKNOWN_ERROR (" + std::to_string(res) + ")\n";
-					DWORD dwWritten;
-					WriteFile(hPipeIn, sPipeMsg.c_str(), sPipeMsg.length(), &dwWritten, nullptr);					
-				}
+					std::cout << "ReadFile failed with error code: " << GetLastError() << std::endl;
 
-				while (client.InWait()) {
-					Sleep(50);
+					DisconnectNamedPipe(hPipeIn);
+
+					std::cout << "Disconnected named pipe" << std::endl;
+					SimpleLog("Shutting down");
+					return 0;
 				}
 			}
 		}
-
-		DisconnectNamedPipe(hPipeIn);
 	}
-	
-	std::cin.get();
 
+	SimpleLog("Shutting down");
 	return 0;
 }
